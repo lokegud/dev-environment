@@ -1,0 +1,52 @@
+{
+  "name": "mcp-websearch-server",
+  "version": "1.0.0",
+  "description": "Web searching and scraping MCP server",
+  "capabilities": {
+    "search": {
+      "engines": ["google", "bing", "duckduckgo", "searx"],
+      "max_results": 50,
+      "safe_search": true,
+      "region": "us-en"
+    },
+    "scraping": {
+      "enabled": true,
+      "parsers": ["html", "json", "xml", "pdf"],
+      "max_depth": 3,
+      "max_pages": 100,
+      "respect_robots_txt": true,
+      "user_agent": "MCP-WebSearch-Bot/1.0"
+    },
+    "extraction": {
+      "selectors": ["css", "xpath", "regex"],
+      "formats": ["text", "html", "markdown", "json"],
+      "clean_html": true
+    },
+    "caching": {
+      "enabled": true,
+      "ttl": 3600,
+      "max_size": "100MB"
+    }
+  },
+  "security": {
+    "authentication": "token",
+    "tls": true,
+    "rate_limiting": {
+      "enabled": true,
+      "max_requests_per_minute": 60,
+      "max_requests_per_domain": 10
+    },
+    "blocked_domains": ["*.gov", "*.mil", "*.bank"]
+  },
+  "networking": {
+    "port": 8003,
+    "host": "0.0.0.0",
+    "protocol": "http",
+    "timeout": 30000
+  },
+  "resources": {
+    "cpu_limit": "750m",
+    "memory_limit": "1Gi",
+    "ephemeral_storage": "2Gi"
+  }
+}

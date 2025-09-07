@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Agent
+metadata:
+  name: web-developer-agent
+  description: "Agent specialized in web development tasks"
+spec:
+  # Agent can select up to 3 additional MCP servers
+  servers:
+    # Primary server for terminal access
+    - name: terminal
+      endpoint: "wss://terminal.mcp.example.com"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: terminal-token
+      priority: 1
+      capabilities:
+        - shell
+        - terminal
+        - commands
+    
+    # Secondary server for browser automation
+    - name: puppeteer
+      endpoint: "wss://puppeteer.mcp.example.com"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: puppeteer-token
+      priority: 2
+      capabilities:
+        - browser
+        - screenshot
+        - pdf
+        - testing
+    
+    # Third server for file operations
+    - name: filesystem
+      endpoint: "grpc://files.mcp.example.com:8004"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: filesystem-token
+      priority: 3
+      capabilities:
+        - read
+        - write
+        - watch
+        - search
+  
+  # Agent configuration
+  config:
+    maxConcurrentServers: 3
+    timeout: 30000
+    retryPolicy:
+      maxRetries: 3
+      backoff: exponential
+    
+  # Resource limits for the agent
+  resources:
+    cpu: "1"
+    memory: "2Gi"
+    
+  # Task configuration
+  tasks:
+    - name: "setup-dev-environment"
+      description: "Setup development environment"
+      servers: ["terminal", "filesystem"]
+      steps:
+        - server: terminal
+          action: execute
+          command: "npm install"
+        - server: filesystem
+          action: write
+          path: "/app/.env"
+          content: "NODE_ENV=development"
+    
+    - name: "run-browser-tests"
+      description: "Run browser-based tests"
+      servers: ["puppeteer", "terminal"]
+      steps:
+        - server: terminal
+          action: execute
+          command: "npm run test:server"
+        - server: puppeteer
+          action: navigate
+          url: "http://localhost:3000"
+        - server: puppeteer
+          action: screenshot
+          path: "/tests/screenshots/"

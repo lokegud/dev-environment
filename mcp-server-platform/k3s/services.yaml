@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-terminal-service
+  namespace: mcp-platform
+  labels:
+    app: mcp-terminal-server
+spec:
+  type: ClusterIP
+  selector:
+    app: mcp-terminal-server
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: websocket
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-puppeteer-service
+  namespace: mcp-platform
+  labels:
+    app: mcp-puppeteer-server
+spec:
+  type: ClusterIP
+  selector:
+    app: mcp-puppeteer-server
+  ports:
+  - port: 8002
+    targetPort: 8002
+    protocol: TCP
+    name: websocket
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-websearch-service
+  namespace: mcp-platform
+  labels:
+    app: mcp-websearch-server
+spec:
+  type: ClusterIP
+  selector:
+    app: mcp-websearch-server
+  ports:
+  - port: 8003
+    targetPort: 8003
+    protocol: TCP
+    name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-filesystem-service
+  namespace: mcp-platform
+  labels:
+    app: mcp-filesystem-server
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: mcp-filesystem-server
+  ports:
+  - port: 8004
+    targetPort: 8004
+    protocol: TCP
+    name: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-automation-service
+  namespace: mcp-platform
+  labels:
+    app: mcp-automation-server
+spec:
+  type: ClusterIP
+  selector:
+    app: mcp-automation-server
+  ports:
+  - port: 8005
+    targetPort: 8005
+    protocol: TCP
+    name: http
+---
+# Supporting Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: mcp-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: mcp-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP

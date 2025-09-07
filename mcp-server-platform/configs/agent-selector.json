@@ -1,0 +1,173 @@
+{
+  "name": "MCP Agent Server Selector",
+  "version": "1.0.0",
+  "description": "Configuration for agent server selection and management",
+  "selection_rules": {
+    "max_servers_per_agent": 3,
+    "selection_strategy": "priority",
+    "fallback_enabled": true,
+    "health_check_interval": 30000
+  },
+  "server_registry": {
+    "terminal": {
+      "id": "mcp-terminal-server",
+      "category": "execution",
+      "capabilities": ["shell", "terminal", "commands"],
+      "resource_weight": 1,
+      "priority": 1,
+      "endpoints": {
+        "docker": "ws://mcp-terminal-server:8001",
+        "k3s": "ws://mcp-terminal-service.mcp-platform.svc.cluster.local:8001",
+        "external": "wss://terminal.mcp.example.com"
+      }
+    },
+    "puppeteer": {
+      "id": "mcp-puppeteer-server",
+      "category": "browser",
+      "capabilities": ["browser", "screenshot", "pdf", "automation"],
+      "resource_weight": 3,
+      "priority": 2,
+      "endpoints": {
+        "docker": "ws://mcp-puppeteer-server:8002",
+        "k3s": "ws://mcp-puppeteer-service.mcp-platform.svc.cluster.local:8002",
+        "external": "wss://puppeteer.mcp.example.com"
+      }
+    },
+    "websearch": {
+      "id": "mcp-websearch-server",
+      "category": "data",
+      "capabilities": ["search", "scrape", "extract", "cache"],
+      "resource_weight": 2,
+      "priority": 3,
+      "endpoints": {
+        "docker": "http://mcp-websearch-server:8003",
+        "k3s": "http://mcp-websearch-service.mcp-platform.svc.cluster.local:8003",
+        "external": "https://search.mcp.example.com"
+      }
+    },
+    "filesystem": {
+      "id": "mcp-filesystem-server",
+      "category": "storage",
+      "capabilities": ["read", "write", "watch", "archive"],
+      "resource_weight": 1,
+      "priority": 4,
+      "endpoints": {
+        "docker": "grpc://mcp-filesystem-server:8004",
+        "k3s": "grpc://mcp-filesystem-service.mcp-platform.svc.cluster.local:8004",
+        "external": "grpc://files.mcp.example.com:8004"
+      }
+    },
+    "automation": {
+      "id": "mcp-automation-server",
+      "category": "orchestration",
+      "capabilities": ["scheduler", "workflow", "notifications", "integrations"],
+      "resource_weight": 2,
+      "priority": 5,
+      "endpoints": {
+        "docker": "http://mcp-automation-server:8005",
+        "k3s": "http://mcp-automation-service.mcp-platform.svc.cluster.local:8005",
+        "external": "https://automation.mcp.example.com"
+      }
+    }
+  },
+  "agent_profiles": {
+    "web-developer": {
+      "description": "Web development and testing",
+      "recommended_servers": ["terminal", "puppeteer", "filesystem"],
+      "required_capabilities": ["shell", "browser", "write"],
+      "resource_budget": 5
+    },
+    "data-analyst": {
+      "description": "Data collection and analysis",
+      "recommended_servers": ["websearch", "filesystem", "automation"],
+      "required_capabilities": ["search", "write", "scheduler"],
+      "resource_budget": 5
+    },
+    "devops": {
+      "description": "Infrastructure and deployment",
+      "recommended_servers": ["terminal", "automation", "filesystem"],
+      "required_capabilities": ["shell", "workflow", "read"],
+      "resource_budget": 4
+    },
+    "content-creator": {
+      "description": "Content generation and publishing",
+      "recommended_servers": ["websearch", "filesystem", "puppeteer"],
+      "required_capabilities": ["search", "write", "screenshot"],
+      "resource_budget": 6
+    },
+    "qa-tester": {
+      "description": "Quality assurance and testing",
+      "recommended_servers": ["puppeteer", "terminal", "automation"],
+      "required_capabilities": ["browser", "shell", "scheduler"],
+      "resource_budget": 6
+    }
+  },
+  "selection_algorithm": {
+    "steps": [
+      {
+        "step": 1,
+        "action": "identify_required_capabilities",
+        "description": "Determine what capabilities the agent needs"
+      },
+      {
+        "step": 2,
+        "action": "filter_available_servers",
+        "description": "Filter servers that provide required capabilities"
+      },
+      {
+        "step": 3,
+        "action": "check_resource_budget",
+        "description": "Ensure total resource weight <= agent's budget"
+      },
+      {
+        "step": 4,
+        "action": "sort_by_priority",
+        "description": "Sort servers by priority score"
+      },
+      {
+        "step": 5,
+        "action": "select_top_n",
+        "description": "Select up to 3 servers"
+      },
+      {
+        "step": 6,
+        "action": "validate_connectivity",
+        "description": "Test connection to selected servers"
+      },
+      {
+        "step": 7,
+        "action": "apply_fallback",
+        "description": "Replace failed servers with alternatives"
+      }
+    ]
+  },
+  "health_checks": {
+    "enabled": true,
+    "interval": 30000,
+    "timeout": 5000,
+    "retry_count": 3,
+    "checks": {
+      "terminal": "/health",
+      "puppeteer": "/health",
+      "websearch": "/health",
+      "filesystem": "/health",
+      "automation": "/health"
+    }
+  },
+  "load_balancing": {
+    "enabled": true,
+    "strategy": "round-robin",
+    "sticky_sessions": false,
+    "health_aware": true
+  },
+  "security": {
+    "authentication_required": true,
+    "token_rotation": true,
+    "token_ttl": 86400,
+    "audit_logging": true,
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 100
+    }
+  }
+}

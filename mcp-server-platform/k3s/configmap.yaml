@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-server-config
+  namespace: mcp-platform
+data:
+  terminal-server.json: |
+    {
+      "name": "mcp-terminal-server",
+      "version": "1.0.0",
+      "capabilities": {
+        "shell": {
+          "enabled": true,
+          "shells": ["bash", "sh"],
+          "max_sessions": 10
+        }
+      },
+      "networking": {
+        "port": 8001,
+        "protocol": "websocket"
+      }
+    }
+  
+  puppeteer-server.json: |
+    {
+      "name": "mcp-puppeteer-server",
+      "version": "1.0.0",
+      "capabilities": {
+        "browser": {
+          "headless": true,
+          "sandbox": true
+        }
+      },
+      "networking": {
+        "port": 8002,
+        "protocol": "websocket"
+      }
+    }
+  
+  websearch-server.json: |
+    {
+      "name": "mcp-websearch-server",
+      "version": "1.0.0",
+      "capabilities": {
+        "search": {
+          "engines": ["google", "bing", "duckduckgo"]
+        }
+      },
+      "networking": {
+        "port": 8003,
+        "protocol": "http"
+      }
+    }
+  
+  filesystem-server.json: |
+    {
+      "name": "mcp-filesystem-server",
+      "version": "1.0.0",
+      "capabilities": {
+        "operations": {
+          "read": true,
+          "write": true
+        }
+      },
+      "networking": {
+        "port": 8004,
+        "protocol": "grpc"
+      }
+    }
+  
+  automation-server.json: |
+    {
+      "name": "mcp-automation-server",
+      "version": "1.0.0",
+      "capabilities": {
+        "scheduler": {
+          "enabled": true
+        }
+      },
+      "networking": {
+        "port": 8005,
+        "protocol": "http"
+      }
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mcp-server-secrets
+  namespace: mcp-platform
+type: Opaque
+stringData:
+  auth-token: "your-secure-token-here"
+  tls-cert: |
+    -----BEGIN CERTIFICATE-----
+    # Your TLS certificate here
+    -----END CERTIFICATE-----
+  tls-key: |
+    -----BEGIN PRIVATE KEY-----
+    # Your TLS private key here
+    -----END PRIVATE KEY-----

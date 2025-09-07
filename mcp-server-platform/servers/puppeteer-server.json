@@ -1,0 +1,50 @@
+{
+  "name": "mcp-puppeteer-server",
+  "version": "1.0.0",
+  "description": "Browser automation MCP server using Puppeteer",
+  "capabilities": {
+    "browser": {
+      "headless": true,
+      "sandbox": true,
+      "args": [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    },
+    "actions": {
+      "navigation": ["goto", "back", "forward", "reload"],
+      "interaction": ["click", "type", "select", "hover", "scroll"],
+      "extraction": ["screenshot", "pdf", "content", "evaluate"],
+      "waiting": ["waitForSelector", "waitForNavigation", "waitForTimeout"]
+    },
+    "pool": {
+      "min": 1,
+      "max": 5,
+      "idle_timeout": 300000,
+      "acquire_timeout": 30000
+    }
+  },
+  "security": {
+    "authentication": "token",
+    "tls": true,
+    "allowed_domains": [],
+    "blocked_domains": ["localhost", "127.0.0.1", "*.internal"],
+    "content_security_policy": "default-src 'self'"
+  },
+  "networking": {
+    "port": 8002,
+    "host": "0.0.0.0",
+    "protocol": "websocket",
+    "proxy": {
+      "enabled": false,
+      "url": ""
+    }
+  },
+  "resources": {
+    "cpu_limit": "1000m",
+    "memory_limit": "2Gi",
+    "ephemeral_storage": "5Gi"
+  }
+}

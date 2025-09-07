@@ -1,0 +1,115 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcp-platform-ingress
+  namespace: mcp-platform
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/websocket-services: "mcp-terminal-service,mcp-puppeteer-service"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - mcp.example.com
+    - terminal.mcp.example.com
+    - puppeteer.mcp.example.com
+    - search.mcp.example.com
+    - files.mcp.example.com
+    - automation.mcp.example.com
+    secretName: mcp-tls-cert
+  rules:
+  - host: terminal.mcp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-terminal-service
+            port:
+              number: 8001
+  - host: puppeteer.mcp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-puppeteer-service
+            port:
+              number: 8002
+  - host: search.mcp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-websearch-service
+            port:
+              number: 8003
+  - host: files.mcp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-filesystem-service
+            port:
+              number: 8004
+  - host: automation.mcp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-automation-service
+            port:
+              number: 8005
+  - host: mcp.example.com
+    http:
+      paths:
+      - path: /terminal
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-terminal-service
+            port:
+              number: 8001
+      - path: /puppeteer
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-puppeteer-service
+            port:
+              number: 8002
+      - path: /search
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-websearch-service
+            port:
+              number: 8003
+      - path: /files
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-filesystem-service
+            port:
+              number: 8004
+      - path: /automation
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-automation-service
+            port:
+              number: 8005

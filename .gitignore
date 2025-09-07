@@ -1,0 +1,46 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# User-specific files
+.bash_history
+.sudo_as_admin_successful
+
+# Cache directories
+.cache/
+
+# SSH keys and sensitive data
+.ssh/
+.gnupg/
+
+# Snap packages
+snap/
+
+# Local config that shouldn't be shared
+.gtkrc-2.0
+.face
+.face.icon
+
+# System status files
+SYSTEM_STATUS_*.txt
+
+# Backup files
+*.backup
+*.tar.gz

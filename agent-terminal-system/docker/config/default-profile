@@ -1,0 +1,87 @@
+#!/bin/bash
+# Default profile for agent terminals
+
+# Agent identification
+export AGENT_ID="${AGENT_ID:-unknown}"
+export AGENT_NAME="${AGENT_NAME:-Agent}"
+export TERMINAL_THEME="${TERMINAL_THEME:-default}"
+
+# Custom prompt with agent info
+export PS1="\[\033[01;32m\][${AGENT_NAME}@\h]\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ "
+
+# Aliases for productivity
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias gs='git status'
+alias gd='git diff'
+alias gc='git commit'
+alias gp='git push'
+alias gl='git log --oneline -10'
+
+# History configuration
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+export HISTCONTROL=ignoreboth:erasedups
+export HISTTIMEFORMAT="%Y-%m-%d %T "
+
+# Enable history append
+shopt -s histappend
+
+# Custom functions
+workspace() {
+    cd ~/workspace/"$1" 2>/dev/null || {
+        echo "Creating workspace: $1"
+        mkdir -p ~/workspace/"$1"
+        cd ~/workspace/"$1"
+    }
+}
+
+# Terminal sharing function
+share_terminal() {
+    local port=${1:-8080}
+    echo "Starting terminal sharing on port ${port}..."
+    ttyd -p "${port}" -c "${AGENT_ID}:${AGENT_ID}" bash
+}
+
+# Log viewer function
+view_logs() {
+    tail -f /var/log/agent-terminal/"${AGENT_ID}"-structured.jsonl | jq '.'
+}
+
+# Session replay function
+replay_session() {
+    local session_id=$1
+    if [ -z "${session_id}" ]; then
+        echo "Available sessions:"
+        ls /var/log/agent-terminal/"${AGENT_ID}"-recording-*.cast 2>/dev/null | sed 's/.*recording-//;s/.cast//'
+        return
+    fi
+    asciinema play "/var/log/agent-terminal/${AGENT_ID}-recording-${session_id}.cast"
+}
+
+# Environment info
+echo "================================================"
+echo " Welcome, ${AGENT_NAME} (ID: ${AGENT_ID})"
+echo " Terminal Theme: ${TERMINAL_THEME}"
+echo " Workspace: ~/workspace"
+echo " Type 'help_agent' for custom commands"
+echo "================================================"
+
+# Custom help function
+help_agent() {
+    cat << EOF
+Agent Terminal Custom Commands:
+  workspace <name>    - Switch to or create a workspace
+  share_terminal [port] - Share terminal via web (default: 8080)
+  view_logs          - View structured logs in real-time
+  replay_session [id] - Replay a terminal session
+  
+Terminal Multiplexer:
+  tmux ls            - List tmux sessions
+  tmux attach -t <name> - Attach to session
+  Ctrl+B, D          - Detach from tmux
+  
+For more help: man tmux | man screen
+EOF
+}

@@ -1,0 +1,237 @@
+version: '3.8'
+
+services:
+  terminal-server:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.terminal
+    container_name: mcp-terminal-server
+    ports:
+      - "8001:8001"
+    networks:
+      - mcp-network
+    volumes:
+      - terminal-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - NODE_ENV=production
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - TLS_CERT_PATH=/app/certs/server.crt
+      - TLS_KEY_PATH=/app/certs/server.key
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    labels:
+      - "mcp.server.type=terminal"
+      - "mcp.server.version=1.0.0"
+
+  puppeteer-server:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.puppeteer
+    container_name: mcp-puppeteer-server
+    ports:
+      - "8002:8002"
+    networks:
+      - mcp-network
+    volumes:
+      - puppeteer-data:/app/data
+      - /dev/shm:/dev/shm
+    environment:
+      - NODE_ENV=production
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    labels:
+      - "mcp.server.type=puppeteer"
+      - "mcp.server.version=1.0.0"
+
+  websearch-server:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.websearch
+    container_name: mcp-websearch-server
+    ports:
+      - "8003:8003"
+    networks:
+      - mcp-network
+    volumes:
+      - search-cache:/app/cache
+    environment:
+      - NODE_ENV=production
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - SEARCH_API_KEY=${SEARCH_API_KEY}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    labels:
+      - "mcp.server.type=websearch"
+      - "mcp.server.version=1.0.0"
+
+  filesystem-server:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.filesystem
+    container_name: mcp-filesystem-server
+    ports:
+      - "8004:8004"
+    networks:
+      - mcp-network
+    volumes:
+      - filesystem-data:/mnt/data
+      - temp-data:/tmp/mcp
+    environment:
+      - NODE_ENV=production
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - FS_SANDBOX_ROOT=/mnt/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    labels:
+      - "mcp.server.type=filesystem"
+      - "mcp.server.version=1.0.0"
+
+  automation-server:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.automation
+    container_name: mcp-automation-server
+    ports:
+      - "8005:8005"
+    networks:
+      - mcp-network
+    volumes:
+      - automation-data:/app/data
+      - workflow-data:/app/workflows
+    environment:
+      - NODE_ENV=production
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - VAULT_ADDR=${VAULT_ADDR}
+      - VAULT_TOKEN=${VAULT_TOKEN}
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://mcp:${DB_PASSWORD}@postgres:5432/mcp
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    labels:
+      - "mcp.server.type=automation"
+      - "mcp.server.version=1.0.0"
+
+  # Supporting services
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-redis
+    networks:
+      - mcp-network
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mcp-postgres
+    networks:
+      - mcp-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=mcp
+      - POSTGRES_USER=mcp
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # API Gateway
+  gateway:
+    image: traefik:v3.0
+    container_name: mcp-gateway
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    networks:
+      - mcp-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik
+      - traefik-certs:/certs
+    environment:
+      - TRAEFIK_API=true
+      - TRAEFIK_API_DASHBOARD=true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`traefik.mcp.local`)"
+      - "traefik.http.routers.api.service=api@internal"
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  terminal-data:
+  puppeteer-data:
+  search-cache:
+  filesystem-data:
+  temp-data:
+  automation-data:
+  workflow-data:
+  redis-data:
+  postgres-data:
+  traefik-certs:

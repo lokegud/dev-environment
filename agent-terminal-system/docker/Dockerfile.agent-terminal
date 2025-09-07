@@ -1,0 +1,65 @@
+# Multi-stage build for optimized agent terminal container
+FROM ubuntu:22.04 AS base
+
+# Install essential packages
+RUN apt-get update && apt-get install -y \
+    # Core utilities
+    curl wget git vim nano \
+    # Terminal multiplexers
+    tmux screen \
+    # Shell enhancements
+    zsh fish \
+    # Development tools
+    build-essential python3 python3-pip nodejs npm \
+    # Network tools
+    openssh-client netcat-openbsd iputils-ping net-tools \
+    # System monitoring
+    htop iotop sysstat \
+    # File management
+    tree jq rsync \
+    # Security tools
+    sudo gnupg2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install oh-my-zsh for better terminal experience
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+
+# Install terminal recording/replay tools
+RUN pip3 install asciinema
+
+# Create agent user with configurable UID/GID
+ARG AGENT_UID=1000
+ARG AGENT_GID=1000
+RUN groupadd -g ${AGENT_GID} agent && \
+    useradd -m -u ${AGENT_UID} -g ${AGENT_GID} -s /bin/zsh agent && \
+    echo "agent ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Setup terminal logging wrapper
+COPY --chown=agent:agent terminal-wrapper.sh /usr/local/bin/terminal-wrapper
+RUN chmod +x /usr/local/bin/terminal-wrapper
+
+# Copy default configurations
+COPY --chown=agent:agent config/default-profile /home/agent/.default-profile
+COPY --chown=agent:agent config/tmux.conf /home/agent/.tmux.conf
+
+# Setup persistent volume mount points
+RUN mkdir -p /home/agent/workspace /home/agent/.ssh /var/log/agent-terminal && \
+    chown -R agent:agent /home/agent /var/log/agent-terminal
+
+# Install gotty for web terminal access
+RUN wget https://github.com/yudai/gotty/releases/download/v1.5.0/gotty_linux_amd64.tar.gz && \
+    tar -xzf gotty_linux_amd64.tar.gz && \
+    mv gotty /usr/local/bin/ && \
+    rm gotty_linux_amd64.tar.gz
+
+# Install ttyd as alternative web terminal
+RUN wget https://github.com/tsl0922/ttyd/releases/download/1.7.4/ttyd.x86_64 -O /usr/local/bin/ttyd && \
+    chmod +x /usr/local/bin/ttyd
+
+# Switch to agent user
+USER agent
+WORKDIR /home/agent
+
+# Default shell with logging
+ENTRYPOINT ["/usr/local/bin/terminal-wrapper"]
+CMD ["tmux", "new-session", "-s", "main"]

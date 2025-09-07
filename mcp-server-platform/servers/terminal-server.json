@@ -1,0 +1,112 @@
+{
+  "name": "mcp-terminal-bridge-server",
+  "version": "1.0.0",
+  "description": "MCP Terminal Bridge - Connects AI agents to isolated terminal environments",
+  "implementation": {
+    "type": "docker",
+    "image": "mcp-terminal-bridge:latest",
+    "build_path": "/home/loke/agent-terminal-system/mcp-bridge",
+    "command": "python mcp_server.py",
+    "working_directory": "/app"
+  },
+  "capabilities": {
+    "terminal_management": {
+      "enabled": true,
+      "max_terminals_per_agent": 5,
+      "terminal_timeout_hours": 4,
+      "supported_commands": ["bash", "sh", "python", "curl", "tmux"],
+      "resource_isolation": true
+    },
+    "tools": [
+      {
+        "name": "create_terminal",
+        "description": "Create a new isolated terminal environment for an agent",
+        "parameters": {
+          "agent_id": "string",
+          "command": "string (optional)",
+          "environment": "object (optional)",
+          "timeout_hours": "integer (optional)"
+        }
+      },
+      {
+        "name": "execute_command",
+        "description": "Execute a command in an existing terminal",
+        "parameters": {
+          "terminal_id": "string",
+          "command": "string",
+          "timeout": "integer (optional)"
+        }
+      },
+      {
+        "name": "get_logs",
+        "description": "Retrieve logs from a terminal",
+        "parameters": {
+          "terminal_id": "string",
+          "lines": "integer (optional)",
+          "stream": "boolean (optional)"
+        }
+      },
+      {
+        "name": "destroy_terminal",
+        "description": "Destroy a terminal and clean up its resources",
+        "parameters": {
+          "terminal_id": "string"
+        }
+      },
+      {
+        "name": "list_terminals",
+        "description": "List all terminals for the authenticated agent"
+      },
+      {
+        "name": "get_terminal_status", 
+        "description": "Get detailed status for a specific terminal",
+        "parameters": {
+          "terminal_id": "string"
+        }
+      }
+    ],
+    "streaming": {
+      "enabled": true,
+      "websocket_support": true,
+      "real_time_logs": true
+    }
+  },
+  "security": {
+    "authentication": "jwt",
+    "token_expiry_hours": 24,
+    "agent_isolation": true,
+    "audit_logging": true,
+    "rate_limiting": {
+      "enabled": true,
+      "max_requests_per_minute": 100,
+      "burst_size": 20
+    }
+  },
+  "networking": {
+    "bridge_port": 8000,
+    "mcp_port": 8001, 
+    "host": "0.0.0.0",
+    "protocol": "stdio",
+    "websocket_port": 8000
+  },
+  "infrastructure": {
+    "docker_integration": true,
+    "terminal_image": "minimal-agent-terminal:latest",
+    "redis_required": true,
+    "elasticsearch_optional": true
+  },
+  "monitoring": {
+    "health_checks": true,
+    "metrics": true,
+    "log_aggregation": true
+  },
+  "resources": {
+    "cpu_limit": "1000m",
+    "memory_limit": "1Gi", 
+    "ephemeral_storage": "2Gi",
+    "terminal_limits": {
+      "cpu_per_terminal": "50m",
+      "memory_per_terminal": "512Mi"
+    }
+  }
+}

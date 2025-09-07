@@ -1,0 +1,59 @@
+{
+  "name": "mcp-automation-server",
+  "version": "1.0.0",
+  "description": "Additional automation utilities MCP server",
+  "capabilities": {
+    "scheduler": {
+      "enabled": true,
+      "backends": ["cron", "interval", "at"],
+      "max_jobs": 100,
+      "persistence": true
+    },
+    "workflow": {
+      "engines": ["n8n", "node-red", "temporal"],
+      "max_workflows": 50,
+      "max_concurrent": 10,
+      "timeout": 3600000
+    },
+    "notifications": {
+      "channels": ["email", "slack", "webhook", "mqtt"],
+      "rate_limit": 100,
+      "retry_policy": {
+        "max_retries": 3,
+        "backoff": "exponential"
+      }
+    },
+    "integrations": {
+      "apis": ["rest", "graphql", "soap", "grpc"],
+      "databases": ["postgresql", "mysql", "mongodb", "redis"],
+      "message_queues": ["rabbitmq", "kafka", "redis-pubsub"]
+    },
+    "scripting": {
+      "languages": ["javascript", "python", "bash"],
+      "sandbox": true,
+      "timeout": 300000
+    }
+  },
+  "security": {
+    "authentication": "token",
+    "tls": true,
+    "api_keys": {
+      "rotation": true,
+      "ttl": 2592000
+    },
+    "secrets_management": {
+      "backend": "vault",
+      "encryption": "aes-256-gcm"
+    }
+  },
+  "networking": {
+    "port": 8005,
+    "host": "0.0.0.0",
+    "protocol": "http"
+  },
+  "resources": {
+    "cpu_limit": "1000m",
+    "memory_limit": "1Gi",
+    "ephemeral_storage": "5Gi"
+  }
+}

@@ -1,0 +1,415 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-terminal-server
+  namespace: mcp-platform
+  labels:
+    app: mcp-terminal-server
+    mcp.server: "true"
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-terminal-server
+  template:
+    metadata:
+      labels:
+        app: mcp-terminal-server
+        mcp.server: "true"
+        tier: backend
+    spec:
+      serviceAccountName: mcp-server-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: terminal-server
+        image: mcp-platform/terminal-server:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+          name: websocket
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MCP_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-secrets
+              key: auth-token
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: tls-certs
+          mountPath: /app/certs
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: mcp-server-config
+          items:
+          - key: terminal-server.json
+            path: config.json
+      - name: tls-certs
+        secret:
+          secretName: mcp-server-secrets
+          items:
+          - key: tls-cert
+            path: server.crt
+          - key: tls-key
+            path: server.key
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-puppeteer-server
+  namespace: mcp-platform
+  labels:
+    app: mcp-puppeteer-server
+    mcp.server: "true"
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mcp-puppeteer-server
+  template:
+    metadata:
+      labels:
+        app: mcp-puppeteer-server
+        mcp.server: "true"
+        tier: backend
+    spec:
+      serviceAccountName: mcp-server-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: puppeteer-server
+        image: mcp-platform/puppeteer-server:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8002
+          name: websocket
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MCP_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-secrets
+              key: auth-token
+        - name: PUPPETEER_ARGS
+          value: "--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage"
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: shm
+          mountPath: /dev/shm
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 45
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8002
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: mcp-server-config
+          items:
+          - key: puppeteer-server.json
+            path: config.json
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-websearch-server
+  namespace: mcp-platform
+  labels:
+    app: mcp-websearch-server
+    mcp.server: "true"
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-websearch-server
+  template:
+    metadata:
+      labels:
+        app: mcp-websearch-server
+        mcp.server: "true"
+        tier: backend
+    spec:
+      serviceAccountName: mcp-server-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: websearch-server
+        image: mcp-platform/websearch-server:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8003
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MCP_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-secrets
+              key: auth-token
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        resources:
+          limits:
+            cpu: 750m
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: cache
+          mountPath: /app/cache
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: mcp-server-config
+          items:
+          - key: websearch-server.json
+            path: config.json
+      - name: cache
+        emptyDir:
+          sizeLimit: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mcp-filesystem-server
+  namespace: mcp-platform
+  labels:
+    app: mcp-filesystem-server
+    mcp.server: "true"
+    tier: backend
+spec:
+  serviceName: mcp-filesystem-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-filesystem-server
+  template:
+    metadata:
+      labels:
+        app: mcp-filesystem-server
+        mcp.server: "true"
+        tier: backend
+    spec:
+      serviceAccountName: mcp-server-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: filesystem-server
+        image: mcp-platform/filesystem-server:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8004
+          name: grpc
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MCP_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-secrets
+              key: auth-token
+        - name: FS_SANDBOX_ROOT
+          value: "/mnt/data"
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: data
+          mountPath: /mnt/data
+        livenessProbe:
+          exec:
+            command:
+            - grpc_health_probe
+            - -addr=:8004
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - grpc_health_probe
+            - -addr=:8004
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: mcp-server-config
+          items:
+          - key: filesystem-server.json
+            path: config.json
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-automation-server
+  namespace: mcp-platform
+  labels:
+    app: mcp-automation-server
+    mcp.server: "true"
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-automation-server
+  template:
+    metadata:
+      labels:
+        app: mcp-automation-server
+        mcp.server: "true"
+        tier: backend
+    spec:
+      serviceAccountName: mcp-server-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: automation-server
+        image: mcp-platform/automation-server:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8005
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MCP_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-secrets
+              key: auth-token
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: POSTGRES_URL
+          value: "postgresql://mcp:password@postgres-service:5432/mcp"
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: workflows
+          mountPath: /app/workflows
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8005
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8005
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: mcp-server-config
+          items:
+          - key: automation-server.json
+            path: config.json
+      - name: workflows
+        emptyDir:
+          sizeLimit: 5Gi

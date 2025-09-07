@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: Agent
+metadata:
+  name: data-analyst-agent
+  description: "Agent specialized in data analysis and research"
+spec:
+  # Agent selects 3 MCP servers for data tasks
+  servers:
+    # Primary server for web searching
+    - name: websearch
+      endpoint: "https://search.mcp.example.com"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: search-token
+      priority: 1
+      capabilities:
+        - search
+        - scrape
+        - extract
+        - cache
+    
+    # Secondary server for file operations
+    - name: filesystem
+      endpoint: "grpc://files.mcp.example.com:8004"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: filesystem-token
+      priority: 2
+      capabilities:
+        - read
+        - write
+        - archive
+        - search
+    
+    # Third server for automation
+    - name: automation
+      endpoint: "https://automation.mcp.example.com"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: automation-token
+      priority: 3
+      capabilities:
+        - scheduler
+        - workflow
+        - notifications
+        - scripting
+  
+  # Agent configuration
+  config:
+    maxConcurrentServers: 3
+    dataProcessing:
+      maxFileSize: "100MB"
+      supportedFormats: ["csv", "json", "xml", "parquet"]
+    caching:
+      enabled: true
+      ttl: 7200
+    
+  # Resource limits
+  resources:
+    cpu: "2"
+    memory: "4Gi"
+    
+  # Workflow definitions
+  workflows:
+    - name: "market-research"
+      description: "Perform market research on a topic"
+      servers: ["websearch", "filesystem", "automation"]
+      steps:
+        - server: websearch
+          action: search
+          params:
+            query: "{{topic}} market analysis 2025"
+            maxResults: 50
+        - server: websearch
+          action: scrape
+          params:
+            urls: "{{search_results}}"
+            depth: 2
+        - server: filesystem
+          action: write
+          params:
+            path: "/research/{{topic}}/raw_data.json"
+            content: "{{scraped_data}}"
+        - server: automation
+          action: script
+          params:
+            language: python
+            code: |
+              import json
+              import pandas as pd
+              # Process and analyze data
+              data = json.load(open('/research/{{topic}}/raw_data.json'))
+              df = pd.DataFrame(data)
+              # Analysis code here
+        - server: automation
+          action: notify
+          params:
+            channel: email
+            recipient: "analyst@example.com"
+            subject: "Market Research Complete: {{topic}}"
+    
+    - name: "scheduled-data-collection"
+      description: "Scheduled data collection pipeline"
+      servers: ["automation", "websearch", "filesystem"]
+      schedule: "0 0 * * *"  # Daily at midnight
+      steps:
+        - server: automation
+          action: trigger
+          params:
+            workflow: "data-collection"
+        - server: websearch
+          action: search
+          params:
+            query: "{{data_source}} latest updates"
+        - server: filesystem
+          action: append
+          params:
+            path: "/data/daily/{{date}}.jsonl"
+            content: "{{collected_data}}"

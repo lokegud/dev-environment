@@ -1,0 +1,185 @@
+version: '3.9'
+
+services:
+  # Elasticsearch for log storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: agent-terminal-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - agent-terminal-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Logstash for log processing
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: agent-terminal-logstash
+    volumes:
+      - ./config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./logs:/var/log/agent-terminal:ro
+    environment:
+      - "LS_JAVA_OPTS=-Xmx256m -Xms256m"
+    ports:
+      - "5000:5000"
+      - "5001:5001/udp"
+    networks:
+      - agent-terminal-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # Kibana for log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: agent-terminal-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - agent-terminal-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: agent-terminal-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - agent-terminal-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Terminal Manager Service
+  terminal-manager:
+    build:
+      context: ./services/terminal-manager
+      dockerfile: Dockerfile
+    container_name: agent-terminal-manager
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - LOG_LEVEL=info
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-here}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config:/app/config:ro
+      - terminal-profiles:/app/profiles
+    ports:
+      - "3000:3000"
+    networks:
+      - agent-terminal-net
+    depends_on:
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  # Web Terminal Interface
+  web-terminal:
+    build:
+      context: ./web-interface
+      dockerfile: Dockerfile
+    container_name: agent-terminal-web
+    environment:
+      - API_URL=http://terminal-manager:3000
+      - WS_URL=ws://terminal-manager:3000
+    ports:
+      - "8080:80"
+    networks:
+      - agent-terminal-net
+    depends_on:
+      - terminal-manager
+
+  # Log Streaming Service
+  log-streamer:
+    build:
+      context: ./services/log-streamer
+      dockerfile: Dockerfile
+    container_name: agent-terminal-log-streamer
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - REDIS_URL=redis://redis:6379
+      - WS_PORT=8081
+    volumes:
+      - ./logs:/var/log/agent-terminal:ro
+    ports:
+      - "8081:8081"
+    networks:
+      - agent-terminal-net
+    depends_on:
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  # Metrics and Monitoring (Prometheus)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: agent-terminal-prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    networks:
+      - agent-terminal-net
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: agent-terminal-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - agent-terminal-net
+    depends_on:
+      - prometheus
+
+volumes:
+  elasticsearch-data:
+  redis-data:
+  terminal-profiles:
+  prometheus-data:
+  grafana-data:
+  agent-workspaces:
+    driver: local
+  agent-homes:
+    driver: local
+
+networks:
+  agent-terminal-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

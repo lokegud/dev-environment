@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  terminal-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-terminal-bridge
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-mcp-terminal-bridge-secret-key}
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - TERMINAL_IMAGE=minimal-agent-terminal:latest
+      - LOG_BASE_DIR=/app/logs
+      - MAX_TERMINALS_PER_AGENT=5
+      - TERMINAL_TIMEOUT_HOURS=4
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logs:/app/logs
+      - ./config:/app/config
+    depends_on:
+      - redis
+      - elasticsearch
+    restart: unless-stopped
+    networks:
+      - mcp-bridge-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-bridge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - mcp-bridge-network
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: mcp-bridge-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+    networks:
+      - mcp-bridge-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: mcp-bridge-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - terminal-bridge
+    restart: unless-stopped
+    networks:
+      - mcp-bridge-network
+
+volumes:
+  redis_data:
+  elasticsearch_data:
+
+networks:
+  mcp-bridge-network:
+    driver: bridge

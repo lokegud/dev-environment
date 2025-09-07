@@ -1,0 +1,82 @@
+{
+  "name": "mcp-terminal-bridge",
+  "version": "1.0.0",
+  "description": "MCP-compatible bridge for agent terminal management",
+  "author": "MCP Terminal Bridge",
+  
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "workers": 1,
+    "reload": false,
+    "log_level": "info",
+    "access_log": true
+  },
+  
+  "security": {
+    "jwt_secret": "${JWT_SECRET}",
+    "jwt_algorithm": "HS256",
+    "jwt_expire_hours": 24,
+    "rate_limiting": {
+      "enabled": true,
+      "max_requests_per_minute": 100,
+      "burst_size": 20
+    },
+    "cors": {
+      "enabled": true,
+      "allow_origins": ["*"],
+      "allow_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      "allow_headers": ["*"]
+    }
+  },
+  
+  "terminal": {
+    "image": "minimal-agent-terminal:latest",
+    "max_terminals_per_agent": 5,
+    "timeout_hours": 4,
+    "log_base_dir": "/tmp/agent-logs",
+    "resource_limits": {
+      "memory": "512m",
+      "cpu_quota": 50000,
+      "cpu_shares": 512
+    },
+    "cleanup_interval_minutes": 5
+  },
+  
+  "redis": {
+    "url": "${REDIS_URL}",
+    "db": 0,
+    "max_connections": 10,
+    "retry_on_timeout": true,
+    "health_check_interval": 30
+  },
+  
+  "elasticsearch": {
+    "url": "${ELASTICSEARCH_URL}",
+    "index_prefix": "mcp-terminal-bridge",
+    "retention_days": 7
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "/app/logs/bridge.log",
+    "max_size": "10MB",
+    "backup_count": 5
+  },
+  
+  "monitoring": {
+    "health_check_enabled": true,
+    "metrics_enabled": true,
+    "prometheus_enabled": false,
+    "prometheus_port": 9090
+  },
+  
+  "features": {
+    "websocket_streaming": true,
+    "command_history": true,
+    "terminal_recording": false,
+    "auto_cleanup": true,
+    "audit_logging": true
+  }
+}

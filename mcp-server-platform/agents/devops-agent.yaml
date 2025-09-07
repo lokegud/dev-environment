@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: Agent
+metadata:
+  name: devops-agent
+  description: "Agent specialized in DevOps and infrastructure automation"
+spec:
+  # Agent selects 3 MCP servers for DevOps tasks
+  servers:
+    # Primary server for terminal/shell operations
+    - name: terminal
+      endpoint: "wss://terminal.mcp.example.com"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: terminal-token
+      priority: 1
+      capabilities:
+        - shell
+        - terminal
+        - commands
+    
+    # Secondary server for automation
+    - name: automation
+      endpoint: "https://automation.mcp.example.com"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: automation-token
+      priority: 2
+      capabilities:
+        - scheduler
+        - workflow
+        - notifications
+        - integrations
+    
+    # Third server for file operations
+    - name: filesystem
+      endpoint: "grpc://files.mcp.example.com:8004"
+      auth:
+        type: token
+        secretRef:
+          name: agent-auth-token
+          key: filesystem-token
+      priority: 3
+      capabilities:
+        - read
+        - write
+        - watch
+        - archive
+  
+  # Agent configuration
+  config:
+    maxConcurrentServers: 3
+    deployment:
+      environments: ["dev", "staging", "prod"]
+      approvalRequired: true
+    monitoring:
+      enabled: true
+      metrics: ["cpu", "memory", "disk", "network"]
+    
+  # Resource limits
+  resources:
+    cpu: "2"
+    memory: "2Gi"
+    
+  # CI/CD Pipelines
+  pipelines:
+    - name: "deploy-application"
+      description: "Deploy application to Kubernetes"
+      servers: ["terminal", "filesystem", "automation"]
+      stages:
+        - name: "build"
+          steps:
+            - server: terminal
+              action: execute
+              command: "docker build -t app:{{version}} ."
+            - server: terminal
+              action: execute
+              command: "docker push registry.example.com/app:{{version}}"
+        
+        - name: "test"
+          steps:
+            - server: terminal
+              action: execute
+              command: "kubectl apply -f test-deployment.yaml"
+            - server: terminal
+              action: execute
+              command: "npm run test:integration"
+        
+        - name: "deploy"
+          steps:
+            - server: filesystem
+              action: read
+              path: "/k8s/deployment.yaml"
+            - server: filesystem
+              action: write
+              path: "/k8s/deployment-{{env}}.yaml"
+              content: "{{processed_manifest}}"
+            - server: terminal
+              action: execute
+              command: "kubectl apply -f /k8s/deployment-{{env}}.yaml"
+        
+        - name: "verify"
+          steps:
+            - server: terminal
+              action: execute
+              command: "kubectl rollout status deployment/app -n {{namespace}}"
+            - server: automation
+              action: notify
+              params:
+                channel: slack
+                webhook: "{{slack_webhook}}"
+                message: "Deployment successful: app:{{version}} to {{env}}"
+    
+    - name: "infrastructure-monitoring"
+      description: "Monitor infrastructure health"
+      servers: ["terminal", "automation"]
+      schedule: "*/5 * * * *"  # Every 5 minutes
+      steps:
+        - server: terminal
+          action: execute
+          command: "kubectl get pods --all-namespaces -o json"
+        - server: terminal
+          action: execute
+          command: "docker system df"
+        - server: automation
+          action: script
+          params:
+            language: python
+            code: |
+              import json
+              # Parse metrics and check thresholds
+              pods = json.loads(pod_output)
+              unhealthy = [p for p in pods if p['status'] != 'Running']
+              if unhealthy:
+                  alert('Unhealthy pods detected', unhealthy)
+    
+    - name: "backup-and-restore"
+      description: "Backup and restore operations"
+      servers: ["terminal", "filesystem", "automation"]
+      steps:
+        - server: terminal
+          action: execute
+          command: "pg_dump -h {{db_host}} -U {{db_user}} {{db_name}} > backup.sql"
+        - server: filesystem
+          action: archive
+          params:
+            source: "/data"
+            destination: "/backups/data-{{timestamp}}.tar.gz"
+            compression: gzip
+        - server: automation
+          action: notify
+          params:
+            channel: email
+            recipient: "ops@example.com"
+            subject: "Backup completed: {{timestamp}}"

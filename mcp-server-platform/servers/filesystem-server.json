@@ -1,0 +1,63 @@
+{
+  "name": "mcp-filesystem-server",
+  "version": "1.0.0",
+  "description": "File system access and operations MCP server",
+  "capabilities": {
+    "operations": {
+      "read": true,
+      "write": true,
+      "delete": true,
+      "move": true,
+      "copy": true,
+      "mkdir": true,
+      "chmod": true
+    },
+    "watch": {
+      "enabled": true,
+      "events": ["add", "change", "unlink", "addDir", "unlinkDir"],
+      "max_watchers": 100
+    },
+    "search": {
+      "enabled": true,
+      "engines": ["find", "grep", "ag"],
+      "max_results": 1000,
+      "timeout": 30000
+    },
+    "archive": {
+      "formats": ["zip", "tar", "gz", "bz2"],
+      "compression": true,
+      "extraction": true
+    }
+  },
+  "security": {
+    "authentication": "token",
+    "tls": true,
+    "sandbox": {
+      "enabled": true,
+      "root": "/mnt/data",
+      "allowed_paths": ["/mnt/data", "/tmp/mcp"],
+      "blocked_paths": ["/etc", "/sys", "/proc", "/root"]
+    },
+    "permissions": {
+      "umask": "0022",
+      "preserve_ownership": false
+    }
+  },
+  "networking": {
+    "port": 8004,
+    "host": "0.0.0.0",
+    "protocol": "grpc"
+  },
+  "resources": {
+    "cpu_limit": "500m",
+    "memory_limit": "512Mi",
+    "ephemeral_storage": "10Gi"
+  },
+  "storage": {
+    "persistent_volume": {
+      "enabled": true,
+      "size": "50Gi",
+      "storage_class": "local-path"
+    }
+  }
+}
