@@ -74,8 +74,25 @@ mkdir -p /workspace/logs
 mkdir -p /workspace/data
 mkdir -p /workspace/temp
 
+# Setup Claude Code and agents
+echo "Setting up Claude Code configuration..."
+mkdir -p ~/.claude/agents ~/.config/claude-code
+
+# Copy Claude agents if they exist in the repository
+if [ -d "/workspace/.claude/agents" ]; then
+    echo "Copying Claude agents..."
+    cp -r /workspace/.claude/agents/* ~/.claude/agents/
+fi
+
+# Copy Claude configuration if it exists
+if [ -f "/workspace/.claude.json" ]; then
+    echo "Copying Claude configuration..."
+    cp /workspace/.claude.json ~/.claude.json
+fi
+
 # Set proper permissions
 sudo chown -R vscode:vscode /workspace
+sudo chown -R vscode:vscode ~/.claude ~/.config/claude-code 2>/dev/null || true
 
 echo "✅ Development environment setup complete!"
 echo ""

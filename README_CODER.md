@@ -6,7 +6,9 @@ This repository is configured as a Coder template for creating cloud development
 
 - **Full Development Stack**: Includes Node.js, Python, Go, Rust, and more
 - **Docker-in-Docker Support**: Run containers inside your workspace
+- **Claude Code Integration**: Pre-installed Claude Code CLI with custom agents
 - **Pre-configured Tools**:
+  - Claude Code CLI with 10+ specialized agents
   - GitHub CLI
   - Docker & Docker Compose
   - Kubernetes (kubectl)
@@ -64,10 +66,28 @@ When creating a workspace, you can customize:
 
 ## Available Commands
 
+- `claude` - Launch Claude Code CLI
 - `agent-term` - Navigate to Agent Terminal System
 - `mcp-server` - Navigate to MCP Server Platform
 - `dc` - Docker Compose shortcut
 - `k` - Kubectl shortcut
+
+## Claude Code Agents
+
+This template includes 10+ specialized Claude agents:
+
+- **ai-infrastructure-optimizer** - AI model deployment and optimization
+- **automation-architect** - Workflow automation design
+- **beastmaster-delegator** - Parallel task distribution
+- **container-orchestration-architect** - Docker/K8s infrastructure
+- **janitor-agent** - Cleanup and maintenance tasks
+- **network-ferryman** - SSH and remote server management
+- **research-librarian-mindmap** - Research and knowledge organization
+- **sounding-board** - Plan validation and review
+- **system-setup-optimizer** - System configuration and optimization
+- **workflow-architect** - Process design and documentation
+
+Run `claude` in your workspace to access these agents.
 
 ## Development Workflow
 

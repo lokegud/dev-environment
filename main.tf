@@ -118,7 +118,23 @@ resource "coder_agent" "main" {
     alias k='kubectl'
     alias agent-term='cd $AGENT_TERMINAL_PATH'
     alias mcp-server='cd $MCP_SERVER_PATH'
+    alias claude='claude-code'
     EOF
+    
+    # Setup Claude Code
+    echo "Setting up Claude Code..."
+    mkdir -p ~/.claude/agents ~/.config/claude-code
+    
+    # Copy Claude agents from repository if they exist
+    if [ -d "/home/coder/workspace/.claude/agents" ]; then
+      echo "Installing Claude agents..."
+      cp -r /home/coder/workspace/.claude/agents/* ~/.claude/agents/
+    fi
+    
+    # Copy Claude configuration if it exists
+    if [ -f "/home/coder/workspace/.claude.json" ]; then
+      cp /home/coder/workspace/.claude.json ~/.claude.json
+    fi
     
     # Install Docker Compose if Docker is enabled
     if [ "${data.coder_parameter.enable_docker.value}" = "true" ]; then
@@ -129,6 +145,7 @@ resource "coder_agent" "main" {
     fi
     
     echo "✅ Workspace setup complete!"
+    echo "🤖 Claude Code is available - run 'claude' to start"
   EOT
 
   metadata {

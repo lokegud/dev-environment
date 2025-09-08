@@ -84,8 +84,15 @@ RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install golang.org/x/lint/golint@latest
 
+# Install Claude Code CLI
+RUN curl -fsSL https://storage.googleapis.com/anthropic-public/claude-code/install.sh | sh
+
 # Setup workspace directory
 RUN mkdir -p /home/$USER/workspace && chown -R $USER:$USER /home/$USER
+
+# Setup Claude directories
+RUN mkdir -p /home/$USER/.claude/agents /home/$USER/.config/claude-code && \
+    chown -R $USER:$USER /home/$USER/.claude /home/$USER/.config
 
 # Switch to coder user
 USER $USER
