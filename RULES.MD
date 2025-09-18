@@ -1,51 +1,108 @@
-**Server Rules**
+**Server Management Rules**
 
-**Global Rules**
-# A) RULES TO FOLLOW (Manual - Require Human/AI Judgment)
+## Directory Structure
+```
+/usr/local/bin/          # Custom system scripts
+/usr/local/sbin/         # Custom admin scripts
+/opt/custom/             # Custom applications
+/etc/[service]/          # Service configurations
+/var/log/[service]/      # Service logs
+/var/lib/[service]/      # Service data
+/var/backups/            # Configuration backups
+/tmp/scripts/            # Temporary/test scripts
+```
 
-### WORKSPACE ORGANIZATION
-1. Everything has its place. Maintain organized workspace structure.
-2. Each container/project gets its own directory containing all related files.
-3. Use iteration directories (v1/, v2/) within projects when iterating.
-6. New projects start in `./projects/wip/[project-name]/`, move to `./projects/complete/` when requirement>
-7. Project documentation in `./docs/[project]/`.
-8. External documentation, failure prevention guides, and learned patterns in `./kb/[category]/[title]`.
+## Script Lifecycle
+1. **Development**: Create in `/tmp/scripts/`
+2. **Testing**: Name with `.test` suffix
+3. **Production**: Move to `/usr/local/bin/`, make executable
+4. **Cleanup**: Delete test scripts after verification
+5. **One-offs**: Delete immediately after running
 
-### TASK COMPLETION  
-12. Work isn't done until every aspect is complete, tested, and documented.
-13. Include itemized cleanup steps in all todos.
-15. Discovered incomplete todos → move to `./todo/` and add to current list.
-16. Clean up your mess. Fix problems you discover.
-21. Todos must be detailed roadmaps with accurate timestamps for each edit.
+## Configuration Management
+1. **Before editing**: `cp config config.bak.$(date +%Y%m%d)`
+2. **After editing**: Test service, document changes
+3. **If it breaks**: Restore from backup immediately
+4. **Weekly cleanup**: Remove backups older than 30 days
 
-### DATA MANAGEMENT
-17. Purging = complete removal of data, configs, and directories.
+## Service Deployment
+1. Stop service
+2. Backup current state
+3. Apply changes
+4. Test thoroughly
+5. Document in `/var/log/changes.log`
+6. Remove temporary files
 
-### SECURITY & CODE QUALITY
-23. Test before marking complete. Document test commands in project README.
-24. Follow existing code style. Run linters/formatters before completion.
+## Monitoring & Logs
+- System changes → `/var/log/changes.log`
+- Custom scripts → `/var/log/custom/`
+- Rotate logs weekly
+- Archive logs older than 90 days
 
-### VERSION CONTROL
-26. Commit with descriptive messages after each logical unit of work.
-27. Never commit broken code to main branch. Use trunk-based development.
+## Communication Rules
+- **Normal mode**: Conversational, explain what user is asking for before doing it
+- **Focus mode**: Direct and concise, minimal explanation
+- State what you're doing and why
+- Ask when unclear, don't assume
+- Confirm understanding of complex tasks before executing
 
-### DEPENDENCIES & RESOURCES
-28. Document all dependencies in appropriate manifest (requirements.txt, package.json, etc.).
-30. Clean up resources: close connections, stop services, free memory.
+## Task Execution
+1. **Before starting any request**: Verify date/time and working directory
+2. **Then**: Explain what user is asking for
+3. **On completion**: Report date/time again
+4. Understand requirement fully
+5. Use TodoWrite for >3 steps
+6. Complete each step before moving on
+7. Test before marking complete
+8. Clean up all temporary resources
+9. Document what was done
 
-### ETHICS & TEAMWORK
-31. No lying, misleading, or intentional misunderstanding.
-32. Point out pitfalls; don't maliciously comply.
-33. We're a team. Share blame and praise equally.
-34. If we can do better, we must do better.
+## Definitions
+- **Request**: Any ask from the user (single command to complex project)
+- **Task**: Single discrete action (edit file, run command)
+- **Job**: Multiple related tasks (set up service, configure system)
+- **Project**: Multiple jobs with shared goal (deploy application stack)
 
-### ACCOUNTABILITY
-35. No laziness. Incomplete work becomes someone else's burden.
+## Security Practices
+- Never store passwords in scripts
+- Use 600 permissions for sensitive files
+- Audit logs before sharing
+- Validate all user input
+- Use absolute paths in scripts
 
-### FAILURE MANAGEMENT
-37. Document failure patterns. Create prevention guides in `./kb/failures/[title]`.
-38. Conduct weekly failure reviews to identify patterns and improvements.
+## Failure Handling
+1. Stop immediately
+2. Document what failed
+3. Restore to known good state
+4. Investigate root cause
+5. Update documentation
 
-### COMMUNICATION
-39. Leave clear comments for non-obvious decisions.
-40. Document breaking changes and migration paths.
+## Collaboration Protocol
+- **Permission to interrupt**: User can stop me anytime with "stop" or "wait"
+- **Going off-track**: User should redirect if I misunderstand
+- **Resource usage**: Check disk space before large operations
+- **Autonomy level**: Proceed with reversible changes, ask before permanent ones
+- **Context switching**: Save state when switching between requests
+
+## Git Commits
+- One logical change per commit
+- Message format: `[component]: action taken`
+- Never commit: secrets, logs, temp files
+- Test before committing
+
+## System Inventory
+Maintain in `/var/log/system-inventory.md`:
+- Installed services and versions
+- Custom scripts and their purpose
+- Modified configurations
+- Active monitoring/automation
+- Port usage and firewall rules
+
+## Cleanup Protocol
+After every session:
+- Delete temp files in `/tmp/`
+- Close open connections
+- Stop test services
+- Document incomplete work
+- Update relevant logs
+- Update system inventory if needed

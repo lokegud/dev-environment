@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/devcontainers/universal:2-linux
 
-ARG USER=coder
+ARG USER=codespace
 
 # Install additional development tools
 RUN apt-get update && apt-get install -y \
@@ -30,26 +30,22 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     && rm -rf /var/lib/apt/lists/*
 
 # Install kubectl
-RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
-    && echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | tee -a /etc/apt/sources.list.d/kubernetes.list \
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
+    && echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list \
     && apt-get update \
     && apt-get install -y kubectl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Terraform
-RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
-    && apt-get update \
-    && apt-get install -y terraform \
-    && rm -rf /var/lib/apt/lists/*
+RUN TERRAFORM_VERSION="1.9.8" \
+    && wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip \
+    && unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip \
+    && mv terraform /usr/local/bin/ \
+    && rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
 
 # Install code-server
 RUN curl -fsSL https://code-server.dev/install.sh | sh
-
-# Create coder user if it doesn't exist
-RUN id -u $USER &>/dev/null || useradd --create-home --shell /bin/bash --uid 1000 --user-group $USER \
-    && echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USER \
-    && chmod 0440 /etc/sudoers.d/$USER
 
 # Install Python packages
 RUN pip3 install --upgrade pip \
@@ -84,17 +80,13 @@ RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install golang.org/x/lint/golint@latest
 
-# Install Claude Code CLI
-RUN curl -fsSL https://storage.googleapis.com/anthropic-public/claude-code/install.sh | sh
+# Setup directories for codespace user
+RUN echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USER \
+    && chmod 0440 /etc/sudoers.d/$USER \
+    && mkdir -p /home/$USER/workspace /home/$USER/.claude/agents /home/$USER/.config/claude-code \
+    && chown -R $USER:$USER /home/$USER
 
-# Setup workspace directory
-RUN mkdir -p /home/$USER/workspace && chown -R $USER:$USER /home/$USER
-
-# Setup Claude directories
-RUN mkdir -p /home/$USER/.claude/agents /home/$USER/.config/claude-code && \
-    chown -R $USER:$USER /home/$USER/.claude /home/$USER/.config
-
-# Switch to coder user
+# Switch to codespace user
 USER $USER
 WORKDIR /home/$USER
 

@@ -1,0 +1,428 @@
+# MCP Server Platform - Docker Compose Configuration
+# Complete stack for all 10 MCP servers with service discovery and monitoring
+
+version: '3.8'
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  mcp-data:
+    driver: local
+  mcp-config:
+    driver: local
+  mcp-logs:
+    driver: local
+  consul-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+services:
+  # Service Discovery
+  consul:
+    image: consul:1.16
+    container_name: mcp-consul
+    hostname: consul
+    networks:
+      - mcp-network
+    ports:
+      - "8500:8500"
+    volumes:
+      - consul-data:/consul/data
+      - ./configs/consul:/consul/config
+    command: >
+      consul agent
+      -server
+      -bootstrap-expect=1
+      -ui
+      -bind=0.0.0.0
+      -client=0.0.0.0
+      -data-dir=/consul/data
+      -config-dir=/consul/config
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    restart: unless-stopped
+
+  # Load Balancer / Reverse Proxy
+  traefik:
+    image: traefik:v3.0
+    container_name: mcp-traefik
+    hostname: traefik
+    networks:
+      - mcp-network
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./configs/traefik:/etc/traefik
+      - ./certs:/certs
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.consulcatalog=true
+      - --providers.consulcatalog.endpoints=consul:8500
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=admin@localhost
+      - --certificatesresolvers.letsencrypt.acme.storage=/certs/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  # Core MCP Servers (Existing)
+  mcp-terminal:
+    image: mcp/terminal-server:latest
+    container_name: mcp-terminal
+    hostname: mcp-terminal
+    networks:
+      - mcp-network
+    ports:
+      - "8001:8001"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - MCP_SERVICE_NAME=terminal-server
+      - MCP_SERVICE_PORT=8001
+      - CONSUL_AGENT=consul:8500
+      - LOG_LEVEL=INFO
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.terminal.rule=PathPrefix(`/api/terminal`)"
+      - "traefik.http.services.terminal.loadbalancer.server.port=8001"
+      - "consul.service.name=mcp-terminal"
+      - "consul.service.port=8001"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-puppeteer:
+    image: mcp/puppeteer-server:latest
+    container_name: mcp-puppeteer
+    hostname: mcp-puppeteer
+    networks:
+      - mcp-network
+    ports:
+      - "8002:8002"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+    environment:
+      - MCP_SERVICE_NAME=puppeteer-server
+      - MCP_SERVICE_PORT=8002
+      - CONSUL_AGENT=consul:8500
+      - CHROME_ARGS=--no-sandbox,--disable-setuid-sandbox
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.puppeteer.rule=PathPrefix(`/api/puppeteer`)"
+      - "traefik.http.services.puppeteer.loadbalancer.server.port=8002"
+      - "consul.service.name=mcp-puppeteer"
+      - "consul.service.port=8002"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-websearch:
+    image: mcp/websearch-server:latest
+    container_name: mcp-websearch
+    hostname: mcp-websearch
+    networks:
+      - mcp-network
+    ports:
+      - "8003:8003"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+    environment:
+      - MCP_SERVICE_NAME=websearch-server
+      - MCP_SERVICE_PORT=8003
+      - CONSUL_AGENT=consul:8500
+      - SEARCH_ENGINES=google,bing,duckduckgo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.websearch.rule=PathPrefix(`/api/websearch`)"
+      - "traefik.http.services.websearch.loadbalancer.server.port=8003"
+      - "consul.service.name=mcp-websearch"
+      - "consul.service.port=8003"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-filesystem:
+    image: mcp/filesystem-server:latest
+    container_name: mcp-filesystem
+    hostname: mcp-filesystem
+    networks:
+      - mcp-network
+    ports:
+      - "8004:8004"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+      - /mcp/sandboxed:/mnt/sandboxed  # Sandboxed file access
+    environment:
+      - MCP_SERVICE_NAME=filesystem-server
+      - MCP_SERVICE_PORT=8004
+      - CONSUL_AGENT=consul:8500
+      - SANDBOX_ROOT=/mnt/sandboxed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.filesystem.rule=PathPrefix(`/api/filesystem`)"
+      - "traefik.http.services.filesystem.loadbalancer.server.port=8004"
+      - "consul.service.name=mcp-filesystem"
+      - "consul.service.port=8004"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-automation:
+    image: mcp/automation-server:latest
+    container_name: mcp-automation
+    hostname: mcp-automation
+    networks:
+      - mcp-network
+    ports:
+      - "8005:8005"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+    environment:
+      - MCP_SERVICE_NAME=automation-server
+      - MCP_SERVICE_PORT=8005
+      - CONSUL_AGENT=consul:8500
+      - WEBHOOK_SECRET=your-webhook-secret-here
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.automation.rule=PathPrefix(`/api/automation`)"
+      - "traefik.http.services.automation.loadbalancer.server.port=8005"
+      - "consul.service.name=mcp-automation"
+      - "consul.service.port=8005"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  # New MCP Servers (Recommended Additions)
+  mcp-database:
+    image: mcp/database-server:latest
+    container_name: mcp-database
+    hostname: mcp-database
+    networks:
+      - mcp-network
+    ports:
+      - "8006:8006"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+    environment:
+      - MCP_SERVICE_NAME=database-server
+      - MCP_SERVICE_PORT=8006
+      - CONSUL_AGENT=consul:8500
+      - DB_POOL_SIZE=20
+      - DB_TIMEOUT=30000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.database.rule=PathPrefix(`/api/database`)"
+      - "traefik.http.services.database.loadbalancer.server.port=8006"
+      - "consul.service.name=mcp-database"
+      - "consul.service.port=8006"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-orchestration:
+    image: mcp/orchestration-server:latest
+    container_name: mcp-orchestration
+    hostname: mcp-orchestration
+    networks:
+      - mcp-network
+    ports:
+      - "8007:8007"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - MCP_SERVICE_NAME=orchestration-server
+      - MCP_SERVICE_PORT=8007
+      - CONSUL_AGENT=consul:8500
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.orchestration.rule=PathPrefix(`/api/orchestration`)"
+      - "traefik.http.services.orchestration.loadbalancer.server.port=8007"
+      - "consul.service.name=mcp-orchestration"
+      - "consul.service.port=8007"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-api-integration:
+    image: mcp/api-integration-server:latest
+    container_name: mcp-api-integration
+    hostname: mcp-api-integration
+    networks:
+      - mcp-network
+    ports:
+      - "8008:8008"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+    environment:
+      - MCP_SERVICE_NAME=api-integration-server
+      - MCP_SERVICE_PORT=8008
+      - CONSUL_AGENT=consul:8500
+      - API_RATE_LIMIT=1000
+      - WEBHOOK_PORT=9008
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-integration.rule=PathPrefix(`/api/integration`)"
+      - "traefik.http.services.api-integration.loadbalancer.server.port=8008"
+      - "consul.service.name=mcp-api-integration"
+      - "consul.service.port=8008"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-code-analysis:
+    image: mcp/code-analysis-server:latest
+    container_name: mcp-code-analysis
+    hostname: mcp-code-analysis
+    networks:
+      - mcp-network
+    ports:
+      - "8009:8009"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+    environment:
+      - MCP_SERVICE_NAME=code-analysis-server
+      - MCP_SERVICE_PORT=8009
+      - CONSUL_AGENT=consul:8500
+      - ANALYSIS_TIMEOUT=300000
+      - MAX_FILE_SIZE=10MB
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.code-analysis.rule=PathPrefix(`/api/code`)"
+      - "traefik.http.services.code-analysis.loadbalancer.server.port=8009"
+      - "consul.service.name=mcp-code-analysis"
+      - "consul.service.port=8009"
+    depends_on:
+      - consul
+    restart: unless-stopped
+
+  mcp-monitoring:
+    image: mcp/monitoring-server:latest
+    container_name: mcp-monitoring
+    hostname: mcp-monitoring
+    networks:
+      - mcp-network
+    ports:
+      - "8010:8010"
+    volumes:
+      - mcp-config:/app/config
+      - mcp-data:/app/data
+      - mcp-logs:/app/logs
+      - prometheus-data:/prometheus
+    environment:
+      - MCP_SERVICE_NAME=monitoring-server
+      - MCP_SERVICE_PORT=8010
+      - CONSUL_AGENT=consul:8500
+      - PROMETHEUS_URL=http://prometheus:9090
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.monitoring.rule=PathPrefix(`/api/monitoring`)"
+      - "traefik.http.services.monitoring.loadbalancer.server.port=8010"
+      - "consul.service.name=mcp-monitoring"
+      - "consul.service.port=8010"
+    depends_on:
+      - consul
+      - prometheus
+    restart: unless-stopped
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mcp-prometheus
+    hostname: prometheus
+    networks:
+      - mcp-network
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus-data:/prometheus
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mcp-grafana
+    hostname: grafana
+    networks:
+      - mcp-network
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./configs/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./configs/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+
+  # Log Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: mcp-loki
+    hostname: loki
+    networks:
+      - mcp-network
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./configs/loki/loki.yml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: mcp-promtail
+    hostname: promtail
+    networks:
+      - mcp-network
+    volumes:
+      - mcp-logs:/var/log/mcp:ro
+      - ./configs/promtail/promtail.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: unless-stopped
